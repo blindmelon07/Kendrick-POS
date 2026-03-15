@@ -166,7 +166,61 @@ new #[Title('Customer Orders')] class extends Component
         <flux:button href="{{ route('orders.create') }}" wire:navigate variant="primary" icon="plus">New Order</flux:button>
     </div>
 
-    <div class="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
+    {{-- Mobile cards --}}
+    <div class="sm:hidden space-y-3">
+        @forelse ($this->orders as $order)
+            <div wire:key="ord-m-{{ $order->id }}" class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <p class="font-mono text-xs font-semibold text-zinc-500 dark:text-zinc-400">{{ $order->reference_no }}</p>
+                        <p class="mt-0.5 font-semibold text-zinc-800 dark:text-zinc-100">{{ $order->client_name }}</p>
+                        @if ($order->client_phone)
+                            <p class="text-xs text-zinc-500">{{ $order->client_phone }}</p>
+                        @endif
+                    </div>
+                    <div class="flex flex-col items-end gap-1">
+                        <flux:badge size="sm" color="{{ $this->statusColor($order->status) }}">
+                            {{ ucfirst(str_replace('_', ' ', $order->status)) }}
+                        </flux:badge>
+                        <flux:badge size="sm" color="{{ $this->paymentColor($order->payment_status) }}">
+                            {{ ucfirst($order->payment_status) }}
+                        </flux:badge>
+                    </div>
+                </div>
+
+                <div class="mt-3 grid grid-cols-3 gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                    <div>
+                        <p class="font-medium text-zinc-400 dark:text-zinc-500">Delivery</p>
+                        <p class="text-zinc-700 dark:text-zinc-200">{{ $order->delivery_date?->format('M d, Y') ?? '—' }}</p>
+                    </div>
+                    <div>
+                        <p class="font-medium text-zinc-400 dark:text-zinc-500">Total</p>
+                        <p class="font-semibold text-zinc-800 dark:text-zinc-100">₱{{ number_format($order->total, 2) }}</p>
+                    </div>
+                    <div>
+                        <p class="font-medium text-zinc-400 dark:text-zinc-500">Balance</p>
+                        <p class="font-semibold {{ $order->balance > 0 ? 'text-red-500' : 'text-zinc-400' }}">₱{{ number_format($order->balance, 2) }}</p>
+                    </div>
+                </div>
+
+                <div class="mt-3 flex items-center justify-between">
+                    <span class="text-xs text-zinc-400">{{ $order->items->count() }} item(s)</span>
+                    <div class="flex gap-1">
+                        <flux:button wire:click="viewItems({{ $order->id }})" variant="ghost" size="sm" icon="list-bullet" title="View Items" />
+                        @if ($order->status !== 'cancelled' && $order->status !== 'delivered')
+                            <flux:button wire:click="openStatusModal({{ $order->id }}, '{{ $order->status }}')" variant="ghost" size="sm" icon="arrow-path" title="Update Status" />
+                            <flux:button wire:click="openCancelModal({{ $order->id }})" variant="ghost" size="sm" icon="x-circle" class="text-red-500" title="Cancel" />
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @empty
+            <p class="py-10 text-center text-zinc-400">No orders found.</p>
+        @endforelse
+    </div>
+
+    {{-- Desktop table --}}
+    <div class="hidden sm:block overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
         <table class="w-full text-sm">
             <thead class="bg-zinc-50 dark:bg-zinc-800">
                 <tr class="border-b border-zinc-200 dark:border-zinc-700">

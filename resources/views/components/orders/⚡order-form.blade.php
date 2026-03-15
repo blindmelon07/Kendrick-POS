@@ -349,40 +349,40 @@ new #[Title('New Order')] class extends Component
                         </flux:field>
                     </div>
 
-                    <div class="flex flex-wrap gap-2">
-                        <flux:field class="flex-1 min-w-40">
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <flux:field class="sm:col-span-2">
                             <flux:label>Product Name <flux:badge size="xs" color="red">Required</flux:badge></flux:label>
                             <flux:input wire:model="addProductName" placeholder="e.g. Portland Cement 40kg" />
                             @error('addProductName') <flux:error>{{ $message }}</flux:error> @enderror
                         </flux:field>
-                        <flux:field class="w-28">
+                        <flux:field>
                             <flux:label>SKU</flux:label>
                             <flux:input wire:model="addSku" placeholder="optional" />
                         </flux:field>
-                        <flux:field class="w-24">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <flux:field>
                             <flux:label>Unit</flux:label>
                             <flux:input wire:model="addUnit" placeholder="bags, pcs" />
                         </flux:field>
-                    </div>
-
-                    <div class="flex flex-wrap items-end gap-2">
-                        <flux:field class="w-28">
+                        <flux:field>
                             <flux:label>Qty</flux:label>
                             <flux:input type="number" min="0.001" step="0.001" wire:model="addQty" />
                             @error('addQty') <flux:error>{{ $message }}</flux:error> @enderror
                         </flux:field>
-                        <flux:field class="w-36">
+                        <flux:field>
                             <flux:label>Unit Price</flux:label>
                             <flux:input type="number" min="0" step="0.01" wire:model="addUnitPrice" prefix="₱" />
                             @error('addUnitPrice') <flux:error>{{ $message }}</flux:error> @enderror
                         </flux:field>
-                        <flux:field class="w-36">
+                        <flux:field>
                             <flux:label>Item Discount</flux:label>
                             <flux:input type="number" min="0" step="0.01" wire:model="addDiscount" prefix="₱" />
                         </flux:field>
-                        <div class="pb-1">
-                            <flux:button wire:click="addItem" variant="primary" icon="plus">Add</flux:button>
-                        </div>
+                    </div>
+                    <div>
+                        <flux:button wire:click="addItem" variant="primary" icon="plus" class="w-full sm:w-auto">Add Item</flux:button>
                     </div>
                 </div>
             </flux:card>
@@ -392,7 +392,30 @@ new #[Title('New Order')] class extends Component
             @enderror
 
             @if (! empty($items))
-                <div class="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
+                {{-- Mobile item cards --}}
+                <div class="sm:hidden space-y-2">
+                    @foreach ($items as $index => $item)
+                        <div wire:key="oi-m-{{ $index }}" class="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
+                            <div class="flex items-start justify-between gap-2">
+                                <div>
+                                    <p class="font-medium text-zinc-800 dark:text-zinc-100">{{ $item['product_name'] }}</p>
+                                    @if ($item['sku'])
+                                        <p class="text-xs text-zinc-400">{{ $item['sku'] }}</p>
+                                    @endif
+                                </div>
+                                <flux:button wire:click="removeItem({{ $index }})" variant="ghost" size="sm" icon="trash" class="text-red-500 shrink-0" />
+                            </div>
+                            <div class="mt-2 grid grid-cols-3 gap-1 text-xs text-zinc-500">
+                                <span>{{ $item['quantity'] + 0 }} {{ $item['unit'] }}</span>
+                                <span class="text-center">₱{{ number_format($item['unit_price'], 2) }}</span>
+                                <span class="text-right font-semibold text-zinc-800 dark:text-zinc-100">₱{{ number_format($item['subtotal'], 2) }}</span>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                {{-- Desktop table --}}
+                <div class="hidden sm:block overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
                     <table class="w-full text-sm">
                         <thead class="bg-zinc-50 dark:bg-zinc-800">
                             <tr class="border-b border-zinc-200 dark:border-zinc-700">

@@ -264,9 +264,34 @@ new #[Title('POS Terminal')] class extends Component
 };
 ?>
 
-<div class="flex h-full min-h-0 gap-4">
+<div
+    class="flex h-full min-h-0 flex-col gap-4 lg:flex-row"
+    x-data="{ tab: 'products' }"
+>
+    {{-- Mobile tab switcher --}}
+    <div class="flex shrink-0 gap-2 lg:hidden">
+        <button
+            @click="tab = 'products'"
+            :class="tab === 'products' ? 'border-blue-500 bg-blue-500 text-white' : 'border-zinc-300 bg-white text-zinc-600 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'"
+            class="flex-1 rounded-xl border py-2 text-sm font-medium transition"
+        >Products</button>
+        <button
+            @click="tab = 'cart'"
+            :class="tab === 'cart' ? 'border-blue-500 bg-blue-500 text-white' : 'border-zinc-300 bg-white text-zinc-600 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'"
+            class="flex-1 rounded-xl border py-2 text-sm font-medium transition"
+        >
+            Cart
+            @if (!empty($cartItems))
+                <span class="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-xs font-bold">{{ count($cartItems) }}</span>
+            @endif
+        </button>
+    </div>
+
     {{-- Left: Product Browser --}}
-    <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+    <div
+        class="flex min-h-0 min-w-0 flex-1 flex-col gap-3"
+        :class="tab === 'products' ? 'flex' : 'hidden lg:flex'"
+    >
 
         {{-- Search --}}
         <flux:input
@@ -309,7 +334,7 @@ new #[Title('POS Terminal')] class extends Component
                         @php $outOfStock = $product->stock_quantity <= 0; @endphp
                         <button
                             wire:key="prod-grid-{{ $product->id }}"
-                            @if (!$outOfStock) wire:click="addToCart({{ $product->id }})" @endif
+                            @if (!$outOfStock) wire:click="addToCart({{ $product->id }})" @click.stop="tab = 'cart'" @endif
                             @disabled($outOfStock)
                             class="flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition
                                 {{ $outOfStock
@@ -331,7 +356,10 @@ new #[Title('POS Terminal')] class extends Component
     </div>
 
     {{-- Right: Cart + Checkout --}}
-    <div class="flex min-h-0 w-72 shrink-0 flex-col gap-3">
+    <div
+        class="flex min-h-0 shrink-0 flex-col gap-3 lg:w-72"
+        :class="tab === 'cart' ? 'flex' : 'hidden lg:flex'"
+    >
 
         {{-- Cart Header --}}
         <div class="flex shrink-0 items-center justify-between">

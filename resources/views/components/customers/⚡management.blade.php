@@ -137,7 +137,42 @@ new #[Title('Customers')] class extends Component
         <flux:button wire:click="create" variant="primary" icon="plus">Add Customer</flux:button>
     </div>
 
-    <div class="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
+    {{-- Mobile cards --}}
+    <div class="sm:hidden space-y-3">
+        @forelse ($this->customers as $customer)
+            <div wire:key="cust-m-{{ $customer->id }}" class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <p class="font-semibold text-zinc-800 dark:text-zinc-100">{{ $customer->name }}</p>
+                        @if ($customer->phone)
+                            <p class="text-xs text-zinc-500">{{ $customer->phone }}</p>
+                        @endif
+                        @if ($customer->email)
+                            <p class="text-xs text-zinc-400">{{ $customer->email }}</p>
+                        @endif
+                    </div>
+                    <div class="flex flex-col items-end gap-1">
+                        <flux:badge size="sm" color="{{ $customer->is_active ? 'green' : 'zinc' }}">
+                            {{ $customer->is_active ? 'Active' : 'Inactive' }}
+                        </flux:badge>
+                        <span class="text-xs text-zinc-400">{{ $customer->orders_count }} order(s)</span>
+                    </div>
+                </div>
+                @if ($customer->address)
+                    <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2">{{ $customer->address }}</p>
+                @endif
+                <div class="mt-3 flex justify-end gap-1">
+                    <flux:button wire:click="edit({{ $customer->id }})" variant="ghost" size="sm" icon="pencil" title="Edit" />
+                    <flux:button wire:click="confirmDelete({{ $customer->id }})" variant="ghost" size="sm" icon="trash" class="text-red-500" title="Delete" />
+                </div>
+            </div>
+        @empty
+            <p class="py-10 text-center text-zinc-400">No customers found.</p>
+        @endforelse
+    </div>
+
+    {{-- Desktop table --}}
+    <div class="hidden sm:block overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
         <table class="w-full text-sm">
             <thead class="bg-zinc-50 dark:bg-zinc-800">
                 <tr class="border-b border-zinc-200 dark:border-zinc-700">
