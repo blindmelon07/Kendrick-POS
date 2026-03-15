@@ -34,6 +34,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::livewire('customers', 'customers.management')->name('customers.index');
     });
 
+    // Employees — Admin & Manager
+    Route::middleware('role:manager|admin')->group(function () {
+        Route::livewire('employees', 'employees.employees')->name('employees.index');
+        Route::livewire('employees/{employeeId}', 'employees.employee-profile')->name('employees.show');
+    });
+
     // User Management — Admin only
     Route::middleware('role:admin')->group(function () {
         Route::livewire('users', 'users.management')->name('users.index');

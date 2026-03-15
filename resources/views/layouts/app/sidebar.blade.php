@@ -64,6 +64,14 @@
                 </flux:sidebar.group>
                 @endhasanyrole
 
+                @hasanyrole('manager|admin')
+                <flux:sidebar.group :heading="__('Employees')" class="grid">
+                    <flux:sidebar.item icon="identification" :href="route('employees.index')" :current="request()->routeIs('employees.*')" wire:navigate>
+                        {{ __('Employees') }}
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+                @endhasanyrole
+
                 @can('users.manage')
                 <flux:sidebar.group :heading="__('Admin')" class="grid">
                     <flux:sidebar.item icon="users" :href="route('users.index')" :current="request()->routeIs('users.*')" wire:navigate>
