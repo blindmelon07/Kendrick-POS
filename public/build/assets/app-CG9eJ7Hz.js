@@ -1,0 +1,1 @@
+(function(){const e=localStorage.getItem("pk-accent")??"default";e!=="default"&&document.documentElement.setAttribute("data-accent",e),localStorage.getItem("flux.appearance")||localStorage.setItem("flux.appearance","dark")})();
