@@ -27,6 +27,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::livewire('suppliers', 'suppliers.management')->name('suppliers.index');
     });
 
+    // Customer Orders & Customers — Admin & Manager
+    Route::middleware('role:manager|admin')->group(function () {
+        Route::livewire('orders', 'orders.orders')->name('orders.index');
+        Route::livewire('orders/create', 'orders.order-form')->name('orders.create');
+        Route::livewire('customers', 'customers.management')->name('customers.index');
+    });
+
     // User Management — Admin only
     Route::middleware('role:admin')->group(function () {
         Route::livewire('users', 'users.management')->name('users.index');

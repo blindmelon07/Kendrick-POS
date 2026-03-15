@@ -53,6 +53,17 @@
                 </flux:sidebar.group>
                 @endcanany
 
+                @hasanyrole('manager|admin')
+                <flux:sidebar.group :heading="__('Orders')" class="grid">
+                    <flux:sidebar.item icon="clipboard-document-check" :href="route('orders.index')" :current="request()->routeIs('orders.*')" wire:navigate>
+                        {{ __('Customer Orders') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="user-group" :href="route('customers.index')" :current="request()->routeIs('customers.*')" wire:navigate>
+                        {{ __('Customers') }}
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+                @endhasanyrole
+
                 @can('users.manage')
                 <flux:sidebar.group :heading="__('Admin')" class="grid">
                     <flux:sidebar.item icon="users" :href="route('users.index')" :current="request()->routeIs('users.*')" wire:navigate>
