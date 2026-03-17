@@ -3,6 +3,7 @@
     <head>
         @include('partials.head')
     </head>
+    @php $customBg = \App\Models\SiteSetting::backgroundUrl(); @endphp
     <body class="min-h-screen glass-bg">
         <x-glass-scene />
         <flux:sidebar sticky collapsible class="glass-sidebar border-e">
@@ -77,6 +78,9 @@
                 <flux:sidebar.group :heading="__('Admin')" class="grid">
                     <flux:sidebar.item icon="users" :href="route('users.index')" :current="request()->routeIs('users.*')" wire:navigate>
                         {{ __('Users') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="paint-brush" :href="route('settings.site')" :current="request()->routeIs('settings.site')" wire:navigate>
+                        {{ __('Site Settings') }}
                     </flux:sidebar.item>
                     <flux:sidebar.item icon="circle-stack" :href="route('admin.backup')" :current="request()->routeIs('admin.backup')" wire:navigate>
                         {{ __('Backup & Restore') }}

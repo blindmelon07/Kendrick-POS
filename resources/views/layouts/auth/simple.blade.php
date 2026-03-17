@@ -3,6 +3,7 @@
     <head>
         @include('partials.head')
     </head>
+    @php $customBg = \App\Models\SiteSetting::backgroundUrl(); @endphp
     <body class="min-h-screen glass-bg antialiased">
         <x-glass-scene />
         <div class="flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">

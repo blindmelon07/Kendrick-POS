@@ -14,3 +14,17 @@
 
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 @fluxAppearance
+
+@php $customBg = \App\Models\SiteSetting::backgroundUrl(); @endphp
+@if($customBg)
+<style>
+    .glass-bg {
+        background-image:
+            linear-gradient(rgba(180,160,220,0.18), rgba(100,80,160,0.22)),
+            url('{{ $customBg }}') !important;
+        background-size: cover !important;
+        background-position: center top !important;
+        background-attachment: fixed !important;
+    }
+</style>
+@endif
