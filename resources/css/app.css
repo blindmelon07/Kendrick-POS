@@ -120,3 +120,229 @@ select:focus[data-flux-control] {
     --color-accent-content: #fb7185;
     --color-accent-foreground: #ffffff;
 }
+
+/* ============================================================
+   Glassmorphism Design System
+   ============================================================ */
+
+/* Photo background — desk setup with ambient lighting */
+.glass-bg {
+    background-image:
+        linear-gradient(rgba(180, 160, 220, 0.18), rgba(100, 80, 160, 0.22)),
+        url('/images/desk-bg.png');
+    background-size: cover;
+    background-position: center top;
+    background-attachment: fixed;
+}
+
+.dark .glass-bg {
+    background-image:
+        linear-gradient(rgba(10, 5, 30, 0.25), rgba(10, 5, 30, 0.25)),
+        url('/images/desk-bg.png');
+    background-size: cover;
+    background-position: center top;
+    background-attachment: fixed;
+}
+
+/* Glass card (user-defined) */
+.glass-card {
+    width: 240px;
+    height: 360px;
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.1),
+        inset 0 0 0px 0px rgba(255, 255, 255, 0);
+    position: relative;
+    overflow: hidden;
+}
+
+.glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+    pointer-events: none;
+}
+
+.glass-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent, rgba(255, 255, 255, 0.3));
+    pointer-events: none;
+}
+
+.dark .glass-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Glass panel — for content sections, tables, forms */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow:
+        0 4px 24px rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.dark .glass-panel {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow:
+        0 4px 24px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Glass form — flexible glass container for login/auth forms */
+.glass-form {
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+    padding: 2rem;
+}
+
+.glass-form::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+    pointer-events: none;
+}
+
+.glass-form::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent, rgba(255, 255, 255, 0.3));
+    pointer-events: none;
+}
+
+.dark .glass-form {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow:
+        0 8px 40px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Glass sidebar
+   backdrop-filter on ::before (not the element itself) avoids the Chrome/Safari
+   bug where direct backdrop-filter on a parent breaks child SVG icon rendering */
+.glass-sidebar {
+    background: transparent !important;
+    position: relative;
+    border-inline-end-color: rgba(255, 255, 255, 0.45) !important;
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.08);
+}
+
+.glass-sidebar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    z-index: -1;
+    pointer-events: none;
+}
+
+.dark .glass-sidebar {
+    border-inline-end-color: rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.25);
+}
+
+.dark .glass-sidebar::before {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Main content area — glass panel so content is always readable */
+[data-flux-main] {
+    background: rgba(255, 255, 255, 0.68);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
+.dark [data-flux-main] {
+    background: rgba(15, 8, 40, 0.45);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
+/* Hide sidebar scrollbar */
+ui-sidebar,
+[data-flux-sidebar] {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+ui-sidebar::-webkit-scrollbar,
+[data-flux-sidebar]::-webkit-scrollbar {
+    display: none;
+}
+
+/* Scene backdrop — hidden, replaced by photo background */
+.glass-scene-bg {
+    display: none;
+}
+
+/* Glass header / top navbar — same ::before trick */
+.glass-header {
+    background: transparent !important;
+    position: relative;
+    border-bottom-color: rgba(255, 255, 255, 0.45) !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+.glass-header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    z-index: -1;
+    pointer-events: none;
+}
+
+.dark .glass-header {
+    border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.dark .glass-header::before {
+    background: rgba(255, 255, 255, 0.05);
+}
