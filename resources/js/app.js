@@ -1,3 +1,10 @@
+import JsBarcode from 'jsbarcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+
+window.JsBarcode = JsBarcode;
+window.Html5Qrcode = Html5Qrcode;
+window.Html5QrcodeSupportedFormats = Html5QrcodeSupportedFormats;
+
 // Apply stored accent immediately to prevent flash of unstyled content
 (function () {
     const accent = localStorage.getItem('pk-accent') ?? 'default';
