@@ -99,6 +99,26 @@ new #[Title('POS Terminal')] class extends Component
         unset($this->searchResults, $this->products);
     }
 
+    public function addToCartBySku(string $sku): void
+    {
+        $product = Product::where('sku', trim($sku))
+            ->where('is_active', true)
+            ->first();
+
+        if (! $product) {
+            $this->dispatch('scan-result', status: 'error', message: "SKU not found: {$sku}");
+            return;
+        }
+
+        if ($product->stock_quantity <= 0) {
+            $this->dispatch('scan-result', status: 'error', message: "{$product->name} is out of stock.");
+            return;
+        }
+
+        $this->addToCart($product->id);
+        $this->dispatch('scan-result', status: 'success', message: "Added: {$product->name}");
+    }
+
     public function updateQuantity(int $index, float $quantity): void
     {
         if ($quantity <= 0) {
@@ -266,8 +286,174 @@ new #[Title('POS Terminal')] class extends Component
 
 <div
     class="flex h-full min-h-0 flex-col gap-4 lg:flex-row"
-    x-data="{ tab: 'products' }"
+    x-data="{
+        tab: 'products',
+
+        // ── Barcode scanner ──────────────────────────────────────
+        _buf: '',
+        _t0: 0,
+        _fast: true,
+        _timer: null,
+        scanToast: null,
+        scanStatus: 'success',
+
+        initScanner() {
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    if (this._buf.length >= 3 && this._fast) {
+                        e.preventDefault();
+                        $wire.addToCartBySku(this._buf);
+                        this.tab = 'cart';
+                    }
+                    this._buf = '';
+                    this._fast = true;
+                    return;
+                }
+
+                if (e.key.length !== 1 || e.ctrlKey || e.altKey || e.metaKey) return;
+
+                const now = Date.now();
+                const diff = now - this._t0;
+                this._t0 = now;
+
+                if (diff > 500) {
+                    // Long pause — restart buffer fresh
+                    this._buf = '';
+                    this._fast = true;
+                } else if (diff > 100) {
+                    // Human typing speed — not a scanner
+                    this._fast = false;
+                }
+
+                this._buf += e.key;
+            });
+        },
+
+        showToast(status, msg) {
+            this.scanStatus = status;
+            this.scanToast = msg;
+            clearTimeout(this._timer);
+            this._timer = setTimeout(() => this.scanToast = null, 3000);
+        },
+
+        // ── Barcode Label Modal ──────────────────────────────────
+        barcodeModal: null,
+
+        openBarcode(product) {
+            this.barcodeModal = product;
+        },
+
+        renderBarcode(sku) {
+            if (window.JsBarcode) {
+                JsBarcode('#barcode-svg', sku, {
+                    format: 'CODE128',
+                    width: 2,
+                    height: 70,
+                    displayValue: true,
+                    fontSize: 13,
+                    margin: 10,
+                    background: '#ffffff',
+                    lineColor: '#000000',
+                });
+            }
+        },
+
+        printBarcode() {
+            window.posPrintBarcode(this.barcodeModal);
+        },
+
+        // ── Camera Scanner ───────────────────────────────────────
+        cameraModal: false,
+
+        openCamera() {
+            this.cameraModal = true;
+            setTimeout(() => window.posStartCamera(), 200);
+        },
+
+        closeCamera() {
+            window.posStopCamera();
+            this.cameraModal = false;
+        }
+    }"
+    x-init="
+        initScanner();
+        $watch('barcodeModal', val => { if (val) $nextTick(() => renderBarcode(val.sku)); });
+    "
+    @scan-result.window="showToast($event.detail.status, $event.detail.message)"
+    @open-barcode.window="openBarcode($event.detail)"
+    @pos-camera-done.document="cameraModal = false"
+    @pos-barcode-scanned.document="$wire.addToCartBySku($event.detail); cameraModal = false; tab = 'cart'"
+    @keydown.escape.window="barcodeModal = null; closeCamera()"
 >
+    {{-- Scan Toast Notification --}}
+    <div
+        x-show="scanToast !== null"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 translate-y-2"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 translate-y-0"
+        x-transition:leave-end="opacity-0 translate-y-2"
+        :class="scanStatus === 'success' ? 'bg-emerald-600' : 'bg-red-600'"
+        class="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-xl"
+        style="display: none;"
+    >
+        <span x-show="scanStatus === 'success'">
+            <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+        </span>
+        <span x-show="scanStatus === 'error'">
+            <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+        </span>
+        <span x-text="scanToast"></span>
+    </div>
+
+    {{-- Camera Scanner Modal --}}
+    <div
+        x-show="cameraModal"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 p-4"
+        style="display: none;"
+    >
+        <div class="w-full max-w-sm">
+            {{-- Header --}}
+            <div class="mb-4 flex items-center justify-between">
+                <div>
+                    <p class="text-lg font-bold text-white">Camera Scanner</p>
+                    <p class="text-xs text-zinc-400">Point camera at a barcode</p>
+                </div>
+                <button
+                    type="button"
+                    @click="closeCamera()"
+                    class="rounded-xl bg-white/10 p-2 text-white hover:bg-white/20"
+                >
+                    <svg class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            {{-- Camera Feed --}}
+            <div class="overflow-hidden rounded-2xl bg-zinc-900 shadow-2xl" style="min-height: 280px;">
+                <div id="camera-feed" style="width: 100%; min-height: 280px;"></div>
+            </div>
+
+            {{-- Status --}}
+            <div id="camera-status" class="mt-3 text-center text-sm text-zinc-400">
+                Starting camera...
+            </div>
+
+            {{-- Cancel button --}}
+            <button
+                type="button"
+                @click="closeCamera()"
+                class="mt-4 w-full rounded-xl border border-white/20 py-3 text-sm font-medium text-white hover:bg-white/10"
+            >Cancel</button>
+        </div>
+    </div>
+
     {{-- Mobile tab switcher --}}
     <div class="flex shrink-0 gap-2 lg:hidden">
         <button
@@ -293,13 +479,40 @@ new #[Title('POS Terminal')] class extends Component
         :class="tab === 'products' ? 'flex' : 'hidden lg:flex'"
     >
 
-        {{-- Search --}}
-        <flux:input
-            wire:model.live.debounce.300ms="search"
-            placeholder="Search product by name or SKU..."
-            icon="magnifying-glass"
-            autofocus
-        />
+        {{-- Search + Camera + Barcode indicator --}}
+        <div class="flex items-center gap-2">
+            <div class="flex-1">
+                <flux:input
+                    wire:model.live.debounce.300ms="search"
+                    placeholder="Search product by name or SKU..."
+                    icon="magnifying-glass"
+                    autofocus
+                />
+            </div>
+
+            {{-- Camera Scan Button --}}
+            <button
+                type="button"
+                @click="openCamera()"
+                class="flex shrink-0 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                title="Scan barcode using camera"
+            >
+                <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
+                </svg>
+                <span class="hidden sm:inline">Camera</span>
+            </button>
+
+            {{-- Physical Scanner Ready indicator --}}
+            <div class="flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                <span class="relative flex size-2">
+                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex size-2 rounded-full bg-emerald-500"></span>
+                </span>
+                <span class="hidden sm:inline">Scan Ready</span>
+            </div>
+        </div>
 
         {{-- Category Tabs --}}
         <div class="flex flex-wrap gap-1.5">
@@ -332,23 +545,44 @@ new #[Title('POS Terminal')] class extends Component
                 <div class="grid grid-cols-2 gap-2 pb-2 sm:grid-cols-3 lg:grid-cols-4">
                     @foreach ($this->products as $product)
                         @php $outOfStock = $product->stock_quantity <= 0; @endphp
-                        <button
+                        <div
                             wire:key="prod-grid-{{ $product->id }}"
-                            @if (!$outOfStock) wire:click="addToCart({{ $product->id }})" @click.stop="tab = 'cart'" @endif
-                            @disabled($outOfStock)
-                            class="flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition
+                            x-data="{ prod: {{ Js::from(['name' => $product->name, 'sku' => $product->sku, 'price' => number_format($product->selling_price, 2)]) }} }"
+                            @if (!$outOfStock)
+                                wire:click="addToCart({{ $product->id }})"
+                                @click="tab = 'cart'"
+                            @endif
+                            class="relative flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition
                                 {{ $outOfStock
                                     ? 'cursor-not-allowed border-zinc-200 bg-zinc-100 opacity-50 dark:border-zinc-700 dark:bg-zinc-800'
                                     : 'cursor-pointer border-zinc-200 bg-white hover:border-blue-400 hover:bg-blue-50 hover:shadow-sm dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-blue-500 dark:hover:bg-zinc-700' }}"
                         >
-                            <p class="line-clamp-2 text-sm font-semibold leading-tight text-zinc-800 dark:text-zinc-100">{{ $product->name }}</p>
+                            {{-- Barcode icon button --}}
+                            <button
+                                type="button"
+                                @click.stop="$dispatch('open-barcode', prod)"
+                                class="absolute right-1.5 top-1.5 rounded-md p-1 text-zinc-300 transition hover:bg-zinc-200 hover:text-zinc-600 dark:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+                                title="View / Print Barcode"
+                            >
+                                <svg class="size-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                    <rect x="1"  y="2" width="2" height="16" rx="0.4"/>
+                                    <rect x="5"  y="2" width="1" height="16" rx="0.4"/>
+                                    <rect x="8"  y="2" width="2" height="16" rx="0.4"/>
+                                    <rect x="12" y="2" width="1" height="16" rx="0.4"/>
+                                    <rect x="15" y="2" width="2" height="16" rx="0.4"/>
+                                    <rect x="18" y="2" width="1" height="16" rx="0.4"/>
+                                </svg>
+                            </button>
+
+                            <p class="line-clamp-2 pr-5 text-sm font-semibold leading-tight text-zinc-800 dark:text-zinc-100">{{ $product->name }}</p>
                             <p class="text-base font-bold text-blue-600 dark:text-blue-400">₱{{ number_format($product->selling_price, 2) }}</p>
                             @if ($outOfStock)
                                 <flux:badge size="sm" color="red">Out of Stock</flux:badge>
                             @else
                                 <p class="text-xs text-zinc-400">{{ number_format($product->stock_quantity, 0) }} {{ $product->unit?->abbreviation }}</p>
                             @endif
-                        </button>
+                            <p class="mt-0.5 text-xs font-mono text-zinc-300 dark:text-zinc-600">{{ $product->sku }}</p>
+                        </div>
                     @endforeach
                 </div>
             @endif
@@ -522,6 +756,72 @@ new #[Title('POS Terminal')] class extends Component
         </flux:button>
     </div>
 
+    {{-- Barcode Label Modal --}}
+    <div
+        x-show="barcodeModal !== null"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        @click.self="barcodeModal = null"
+        style="display: none;"
+    >
+        <div
+            x-show="barcodeModal !== null"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95"
+            class="w-full max-w-xs rounded-2xl bg-white shadow-2xl dark:bg-zinc-900"
+        >
+            {{-- Modal Header --}}
+            <div class="flex items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
+                <div>
+                    <p class="text-xs font-medium text-zinc-400 uppercase tracking-wide">Barcode Label</p>
+                    <p class="text-sm font-semibold text-zinc-800 dark:text-zinc-100" x-text="barcodeModal?.name"></p>
+                </div>
+                <button
+                    type="button"
+                    @click="barcodeModal = null"
+                    class="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800"
+                >
+                    <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            {{-- Barcode Preview --}}
+            <div class="flex flex-col items-center px-5 py-6">
+                <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700">
+                    <svg id="barcode-svg"></svg>
+                </div>
+                <p class="mt-3 font-mono text-sm font-medium text-zinc-500 dark:text-zinc-400" x-text="barcodeModal?.sku"></p>
+                <p class="mt-1 text-xl font-bold text-blue-600 dark:text-blue-400" x-text="'₱' + barcodeModal?.price"></p>
+            </div>
+
+            {{-- Actions --}}
+            <div class="flex gap-2 border-t border-zinc-100 px-5 py-4 dark:border-zinc-800">
+                <button
+                    type="button"
+                    @click="barcodeModal = null"
+                    class="flex-1 rounded-xl border border-zinc-300 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >Close</button>
+                <button
+                    type="button"
+                    @click="printBarcode()"
+                    class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                >
+                    <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    Print Label
+                </button>
+            </div>
+        </div>
+    </div>
+
     {{-- Receipt Modal --}}
     @if ($showReceipt && $completedTransactionId)
         @php $receiptTx = \App\Models\Transaction::with(['items', 'cashier'])->find($completedTransactionId); @endphp
@@ -588,3 +888,116 @@ new #[Title('POS Terminal')] class extends Component
         @endif
     @endif
 </div>
+
+@script
+<script>
+// ── Camera Scanner ────────────────────────────────────────────
+var _posScanner = null;
+
+window.posStartCamera = function () {
+    var statusEl = document.getElementById('camera-status');
+
+    function setStatus(msg) {
+        if (statusEl) statusEl.textContent = msg;
+    }
+
+    if (!window.Html5Qrcode) {
+        setStatus('Camera library not ready. Please refresh the page.');
+        return;
+    }
+
+    // Explicitly support 1D barcode formats — without this, only QR codes are scanned
+    var formats = [
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.QR_CODE,
+    ];
+
+    Html5Qrcode.getCameras().then(function (cameras) {
+        if (!cameras || cameras.length === 0) {
+            setStatus('No camera found on this device.');
+            return;
+        }
+
+        // Prefer back/environment camera on mobile; fall back to first available
+        var cam = cameras.find(function (c) {
+            var label = (c.label || '').toLowerCase();
+            return label.includes('back') || label.includes('rear') || label.includes('environment');
+        }) || cameras[0];
+
+        _posScanner = new Html5Qrcode('camera-feed');
+
+        var config = {
+            fps: 15,
+            qrbox: { width: 250, height: 100 },
+            formatsToSupport: formats,
+        };
+
+        _posScanner.start(
+            cam.id,
+            config,
+            function (decodedText) {
+                var sku = decodedText.trim();
+                window.posStopCamera();
+                // Dispatch to Alpine — $wire is called safely in the template listener
+                document.dispatchEvent(new CustomEvent('pos-barcode-scanned', { detail: sku }));
+            },
+            function () { /* per-frame decode miss — normal, keep scanning */ }
+        ).then(function () {
+            setStatus('Scanning — aim the barcode at the green box.');
+        }).catch(function (err) {
+            var msg = (err || '').toString();
+            if (msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('notallowed')) {
+                setStatus('Camera permission denied. Please allow camera access in your browser settings.');
+            } else {
+                setStatus('Could not start camera: ' + msg);
+            }
+        });
+
+    }).catch(function () {
+        setStatus('Cannot access camera. Check that your browser has camera permission.');
+    });
+};
+
+window.posStopCamera = function () {
+    if (_posScanner) {
+        _posScanner.stop().catch(function () {}).finally(function () {
+            if (_posScanner) { _posScanner.clear(); }
+            _posScanner = null;
+        });
+    }
+};
+
+// ── Barcode Label Printer ─────────────────────────────────────
+window.posPrintBarcode = function (product) {
+    var svgEl = document.getElementById('barcode-svg');
+    var svgContent = svgEl ? svgEl.outerHTML : '';
+    var w = window.open('', '_blank', 'width=420,height=340');
+    var html = [
+        '<!DOCTYPE html><html><head><title>Barcode Label</title>',
+        '<style>',
+        '@media print { body { margin: 0; } }',
+        'body { font-family: sans-serif; text-align: center; padding: 24px; }',
+        '.lbl-name  { font-size: 15px; font-weight: 700; margin-bottom: 4px; }',
+        '.lbl-sku   { font-size: 11px; color: #888; margin-bottom: 10px; }',
+        '.lbl-price { font-size: 22px; font-weight: 800; color: #2563eb; margin-top: 10px; }',
+        '</style></head>',
+        '<body>',
+        '<div class="lbl-name">'  + product.name  + '</div>',
+        '<div class="lbl-sku">'   + product.sku   + '</div>',
+        svgContent,
+        '<div class="lbl-price">&#8369;' + product.price + '</div>',
+        '</body></html>',
+    ].join('');
+    w.document.write(html);
+    w.document.close();
+    setTimeout(function () { w.print(); }, 400);
+};
+</script>
+@endscript
