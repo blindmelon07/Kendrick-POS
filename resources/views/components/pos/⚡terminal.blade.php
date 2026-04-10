@@ -101,8 +101,10 @@ new #[Title('POS Terminal')] class extends Component
 
     public function addToCartBySku(string $sku): void
     {
-        $product = Product::where('sku', trim($sku))
-            ->where('is_active', true)
+        $product = Product::where('is_active', true)
+            ->where(fn ($q) => $q
+                ->where('barcode', trim($sku))
+                ->orWhere('sku', trim($sku)))
             ->first();
 
         if (! $product) {
@@ -377,7 +379,7 @@ new #[Title('POS Terminal')] class extends Component
     }"
     x-init="
         initScanner();
-        $watch('barcodeModal', val => { if (val) $nextTick(() => renderBarcode(val.sku)); });
+        $watch('barcodeModal', val => { if (val) $nextTick(() => renderBarcode(val.barcode)); });
     "
     @scan-result.window="showToast($event.detail.status, $event.detail.message)"
     @open-barcode.window="openBarcode($event.detail)"
@@ -547,7 +549,7 @@ new #[Title('POS Terminal')] class extends Component
                         @php $outOfStock = $product->stock_quantity <= 0; @endphp
                         <div
                             wire:key="prod-grid-{{ $product->id }}"
-                            x-data="{ prod: {{ Js::from(['name' => $product->name, 'sku' => $product->sku, 'price' => number_format($product->selling_price, 2)]) }} }"
+                            x-data="{ prod: {{ Js::from(['name' => $product->name, 'sku' => $product->sku, 'barcode' => $product->barcode ?: $product->sku, 'price' => number_format($product->selling_price, 2)]) }} }"
                             @if (!$outOfStock)
                                 wire:click="addToCart({{ $product->id }})"
                                 @click="tab = 'cart'"
@@ -799,7 +801,7 @@ new #[Title('POS Terminal')] class extends Component
                 <div class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700">
                     <svg id="barcode-svg"></svg>
                 </div>
-                <p class="mt-3 font-mono text-sm font-medium text-zinc-500 dark:text-zinc-400" x-text="barcodeModal?.sku"></p>
+                <p class="mt-3 font-mono text-sm font-medium text-zinc-500 dark:text-zinc-400" x-text="barcodeModal?.barcode"></p>
                 <p class="mt-1 text-xl font-bold text-blue-600 dark:text-blue-400" x-text="'₱' + barcodeModal?.price"></p>
             </div>
 
@@ -990,7 +992,7 @@ window.posPrintBarcode = function (product) {
         '</style></head>',
         '<body>',
         '<div class="lbl-name">'  + product.name  + '</div>',
-        '<div class="lbl-sku">'   + product.sku   + '</div>',
+        '<div class="lbl-sku">'   + product.barcode + '</div>',
         svgContent,
         '<div class="lbl-price">&#8369;' + product.price + '</div>',
         '</body></html>',
