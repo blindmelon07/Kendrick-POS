@@ -15,8 +15,7 @@
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 @fluxAppearance
 
-@php $customBg = \App\Models\SiteSetting::backgroundUrl(); @endphp
-@if($customBg)
+@php $customBg = \App\Models\SiteSetting::backgroundUrl() ?? asset('images/desk-bg.png'); @endphp
 <style>
     .glass-bg {
         background-image:
@@ -27,4 +26,3 @@
         background-attachment: fixed !important;
     }
 </style>
-@endif
