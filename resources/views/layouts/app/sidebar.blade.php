@@ -63,6 +63,9 @@
                     <flux:sidebar.item icon="user-group" :href="route('customers.index')" :current="request()->routeIs('customers.*')" wire:navigate>
                         {{ __('Customers') }}
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="calendar-days" :href="route('daily-menu.index')" :current="request()->routeIs('daily-menu.*')" wire:navigate>
+                        {{ __('Daily Menu') }}
+                    </flux:sidebar.item>
                 </flux:sidebar.group>
                 @endhasanyrole
 

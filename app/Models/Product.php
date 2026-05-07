@@ -48,4 +48,10 @@ class Product extends Model
     {
         return $this->hasMany(StockMovement::class);
     }
+
+    /** @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\DailyMenu, $this> */
+    public function dailyMenus(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\DailyMenu::class);
+    }
 }

@@ -28,6 +28,8 @@ class Order extends Model
         'total',
         'payment_method',
         'payment_status',
+        'paymongo_checkout_id',
+        'paymongo_payment_id',
         'amount_paid',
         'status',
         'created_by',

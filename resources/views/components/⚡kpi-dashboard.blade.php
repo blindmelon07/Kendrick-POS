@@ -181,7 +181,11 @@ new #[Title('KPI Dashboard')] class extends Component
     {
         $rows = Transaction::where('status', 'completed')
             ->whereDate('created_at', today())
-            ->selectRaw('HOUR(created_at) as hour, SUM(total) as total')
+            ->selectRaw(
+                config('database.default') === 'sqlite'
+                    ? "CAST(strftime('%H', created_at) AS INTEGER) as hour, SUM(total) as total"
+                    : 'HOUR(created_at) as hour, SUM(total) as total'
+            )
             ->groupBy('hour')
             ->pluck('total', 'hour');
 

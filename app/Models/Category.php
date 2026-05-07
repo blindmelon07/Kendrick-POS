@@ -10,11 +10,14 @@ class Category extends Model
     /** @use HasFactory<\Database\Factories\CategoryFactory> */
     use HasFactory;
 
-    protected $fillable = ['name', 'description', 'is_active'];
+    protected $fillable = ['name', 'description', 'is_active', 'is_menu_item'];
 
     public function casts(): array
     {
-        return ['is_active' => 'boolean'];
+        return [
+            'is_active'    => 'boolean',
+            'is_menu_item' => 'boolean',
+        ];
     }
 
     /** @return \Illuminate\Database\Eloquent\Relations\HasMany<Product, $this> */

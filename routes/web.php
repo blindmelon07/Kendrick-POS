@@ -2,7 +2,34 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/login')->name('home');
+// Admin login alias
+Route::redirect('administrator/login', '/login')->name('admin.login');
+
+// PayMongo webhook (must be outside CSRF middleware — handled via web middleware exclusion)
+Route::post('paymongo/webhook', \App\Http\Controllers\PayMongoWebhookController::class)
+    ->name('paymongo.webhook');
+
+// Payment return pages (after customer pays or cancels on PayMongo)
+Route::middleware('auth')->group(function () {
+    Route::livewire('payment/success/{orderId}', 'public.payment-result')->name('payment.success');
+    Route::livewire('payment/cancel/{orderId}',  'public.payment-result')->name('payment.cancel');
+});
+
+// Customer-facing auth pages
+Route::middleware('guest')->group(function () {
+    Route::livewire('customer/login', 'auth.customer-login')->name('customer.login');
+    Route::livewire('customer/register', 'auth.customer-register')->name('customer.register');
+});
+
+// Public-facing food ordering pages
+Route::livewire('/', 'public.home')->name('home');
+Route::livewire('/menu', 'public.menu')->name('public.menu');
+Route::livewire('/cart', 'public.cart')->name('public.cart');
+
+Route::middleware('auth')->group(function () {
+    Route::livewire('/checkout', 'public.checkout')->name('public.checkout');
+    Route::livewire('/my-orders', 'public.my-orders')->name('public.my-orders');
+});
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');
@@ -32,6 +59,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::livewire('orders', 'orders.orders')->name('orders.index');
         Route::livewire('orders/create', 'orders.order-form')->name('orders.create');
         Route::livewire('customers', 'customers.management')->name('customers.index');
+        Route::livewire('daily-menu', 'daily-menu.management')->name('daily-menu.index');
     });
 
     // Employees — Admin & Manager

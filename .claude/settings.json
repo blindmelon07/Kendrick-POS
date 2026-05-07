@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo \"\")",
+      "Bash(echo \"# PayMongo\")",
+      "Bash(echo \"PAYMONGO_SECRET_KEY=\")",
+      "Bash(echo \"PAYMONGO_PUBLIC_KEY=\")",
+      "Bash(echo \"PAYMONGO_WEBHOOK_SECRET=\")"
+    ]
+  }
+}
