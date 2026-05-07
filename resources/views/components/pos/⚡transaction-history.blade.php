@@ -2,6 +2,7 @@
 
 use App\Models\Transaction;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -55,45 +56,48 @@ new #[Title('Transaction History')] class extends Component
 
     public function voidTransaction(): void
     {
+        abort_unless(Auth::user()->can('pos.void'), 403);
+
         $this->validate(['voidReason' => ['required', 'string', 'min:5']]);
 
-        $transaction = Transaction::where('status', 'completed')
-            ->findOrFail($this->voidTransactionId);
+        DB::transaction(function () {
+            $transaction = Transaction::where('status', 'completed')
+                ->findOrFail($this->voidTransactionId);
 
-        $transaction->update([
-            'status'      => 'voided',
-            'voided_by'   => Auth::id(),
-            'voided_at'   => now(),
-            'void_reason' => $this->voidReason,
-        ]);
+            $transaction->update([
+                'status'      => 'voided',
+                'voided_by'   => Auth::id(),
+                'voided_at'   => now(),
+                'void_reason' => $this->voidReason,
+            ]);
 
-        foreach ($transaction->items as $item) {
-            if (! $item->product_id) {
-                continue;
+            foreach ($transaction->items as $item) {
+                if (! $item->product_id) {
+                    continue;
+                }
+
+                $product = \App\Models\Product::lockForUpdate()->find($item->product_id);
+                if ($product) {
+                    $before                  = (float) $product->stock_quantity;
+                    $product->stock_quantity += $item->quantity;
+                    $product->save();
+
+                    \App\Models\StockMovement::create([
+                        'product_id'      => $product->id,
+                        'type'            => 'in',
+                        'quantity'        => $item->quantity,
+                        'before_quantity' => $before,
+                        'after_quantity'  => (float) $product->stock_quantity,
+                        'reason'          => 'Void - ' . $transaction->reference_no,
+                        'reference'       => $transaction->reference_no,
+                        'user_id'         => Auth::id(),
+                    ]);
+                }
             }
-
-            $product = \App\Models\Product::find($item->product_id);
-            if ($product) {
-                $before                  = (float) $product->stock_quantity;
-                $product->stock_quantity += $item->quantity;
-                $product->save();
-
-                \App\Models\StockMovement::create([
-                    'product_id'      => $product->id,
-                    'type'            => 'in',
-                    'quantity'        => $item->quantity,
-                    'before_quantity' => $before,
-                    'after_quantity'  => (float) $product->stock_quantity,
-                    'reason'          => 'Void - ' . $transaction->reference_no,
-                    'reference'       => $transaction->reference_no,
-                    'user_id'         => Auth::id(),
-                ]);
-            }
-        }
+        });
 
         $this->showVoidModal     = false;
         $this->voidTransactionId = null;
-        unset($this->transactions);
         $this->dispatch('notify', message: 'Transaction voided successfully.');
     }
 

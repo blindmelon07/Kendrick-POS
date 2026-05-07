@@ -97,6 +97,8 @@ new #[Title('Customer Orders')] class extends Component
 
     public function cancelOrder(): void
     {
+        abort_unless(auth()->user()->hasAnyRole(['admin', 'manager']), 403);
+
         $this->validate([
             'cancellationReason' => ['required', 'string', 'min:5'],
         ]);
@@ -315,7 +317,7 @@ new #[Title('Customer Orders')] class extends Component
                                         <p class="text-xs text-zinc-400">{{ $item->sku }}</p>
                                     @endif
                                 </td>
-                                <td class="px-4 py-2 text-right">{{ $item->quantity + 0 }} {{ $item->unit }}</td>
+                                <td class="px-4 py-2 text-right">{{ $item->quantity ?? 0 }} {{ $item->unit }}</td>
                                 <td class="px-4 py-2 text-right">₱{{ number_format($item->unit_price, 2) }}</td>
                                 <td class="px-4 py-2 text-right">{{ $item->discount_amount > 0 ? '₱' . number_format($item->discount_amount, 2) : '—' }}</td>
                                 <td class="px-4 py-2 text-right font-semibold">₱{{ number_format($item->subtotal, 2) }}</td>

@@ -229,7 +229,7 @@ new #[Title('POS Terminal')] class extends Component
                     'subtotal'        => $item['subtotal'],
                 ]);
 
-                $product = Product::find($item['product_id']);
+                $product = Product::lockForUpdate()->find($item['product_id']);
                 if ($product) {
                     $before                  = (float) $product->stock_quantity;
                     $product->stock_quantity -= $item['quantity'];

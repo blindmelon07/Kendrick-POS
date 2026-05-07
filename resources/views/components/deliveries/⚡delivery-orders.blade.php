@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\DeliveryOrder;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -59,38 +60,40 @@ new #[Title('Delivery Orders')] class extends Component
 
         $delivery = DeliveryOrder::with('items')->findOrFail($this->updatingId);
 
-        if ($this->newStatus === 'received' && $delivery->status !== 'received') {
-            foreach ($delivery->items as $item) {
-                if (! $item->product_id) {
-                    continue;
+        DB::transaction(function () use ($delivery) {
+            if ($this->newStatus === 'received' && $delivery->status !== 'received') {
+                foreach ($delivery->items as $item) {
+                    if (! $item->product_id) {
+                        continue;
+                    }
+
+                    $product = \App\Models\Product::lockForUpdate()->find($item->product_id);
+                    if ($product) {
+                        $before                  = (float) $product->stock_quantity;
+                        $received                = (float) $item->received_quantity ?: (float) $item->expected_quantity;
+                        $product->stock_quantity += $received;
+                        $product->save();
+
+                        \App\Models\StockMovement::create([
+                            'product_id'      => $product->id,
+                            'type'            => 'in',
+                            'quantity'        => $received,
+                            'before_quantity' => $before,
+                            'after_quantity'  => (float) $product->stock_quantity,
+                            'reason'          => 'Delivery - ' . $delivery->delivery_number,
+                            'reference'       => $delivery->delivery_number,
+                            'user_id'         => \Illuminate\Support\Facades\Auth::id(),
+                        ]);
+
+                        $item->update(['received_quantity' => $received]);
+                    }
                 }
 
-                $product = \App\Models\Product::find($item->product_id);
-                if ($product) {
-                    $before                  = (float) $product->stock_quantity;
-                    $received                = (float) $item->received_quantity ?: (float) $item->expected_quantity;
-                    $product->stock_quantity += $received;
-                    $product->save();
-
-                    \App\Models\StockMovement::create([
-                        'product_id'      => $product->id,
-                        'type'            => 'in',
-                        'quantity'        => $received,
-                        'before_quantity' => $before,
-                        'after_quantity'  => (float) $product->stock_quantity,
-                        'reason'          => 'Delivery - ' . $delivery->delivery_number,
-                        'reference'       => $delivery->delivery_number,
-                        'user_id'         => \Illuminate\Support\Facades\Auth::id(),
-                    ]);
-
-                    $item->update(['received_quantity' => $received]);
-                }
+                $delivery->update(['received_at' => now()]);
             }
 
-            $delivery->update(['received_at' => now()]);
-        }
-
-        $delivery->update(['status' => $this->newStatus]);
+            $delivery->update(['status' => $this->newStatus]);
+        });
         $this->showStatusModal = false;
         unset($this->deliveries);
     }
