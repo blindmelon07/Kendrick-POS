@@ -12,7 +12,8 @@
       "Bash(Get-ChildItem -Path \"c:\\\\xampp2\\\\htdocs\\\\kendrick\" -Directory)",
       "Bash(Select-Object Name)",
       "Bash(ls -la c:\\\\\\\\xampp2\\\\\\\\htdocs\\\\\\\\kendrick)",
-      "Bash(xargs grep -l \"driver\\\\|delivery\\\\|rider\")"
+      "Bash(xargs grep -l \"driver\\\\|delivery\\\\|rider\")",
+      "Bash(php -l resources/views/components/⚡kpi-dashboard.blade.php)"
     ]
   }
 }
