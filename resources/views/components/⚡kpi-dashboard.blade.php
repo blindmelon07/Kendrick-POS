@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
@@ -34,22 +36,42 @@ new #[Title('KPI Dashboard')] class extends Component
         };
     }
 
+    private function onlineRevenue(array $range): float
+    {
+        [$start, $end] = $range;
+        return (float) Order::where('payment_status', 'paid')
+            ->whereBetween('updated_at', [$start, $end])
+            ->sum('total');
+    }
+
+    private function onlineOrderCount(array $range): int
+    {
+        [$start, $end] = $range;
+        return Order::where('payment_status', 'paid')
+            ->whereBetween('updated_at', [$start, $end])
+            ->count();
+    }
+
     #[Computed]
     public function periodRevenue(): float
     {
-        [$start, $end] = $this->dateRange();
-        return (float) Transaction::where('status', 'completed')
+        $range = $this->dateRange();
+        [$start, $end] = $range;
+        $pos = (float) Transaction::where('status', 'completed')
             ->whereBetween('created_at', [$start, $end])
             ->sum('total');
+        return $pos + $this->onlineRevenue($range);
     }
 
     #[Computed]
     public function previousRevenue(): float
     {
-        [$start, $end] = $this->previousDateRange();
-        return (float) Transaction::where('status', 'completed')
+        $range = $this->previousDateRange();
+        [$start, $end] = $range;
+        $pos = (float) Transaction::where('status', 'completed')
             ->whereBetween('created_at', [$start, $end])
             ->sum('total');
+        return $pos + $this->onlineRevenue($range);
     }
 
     #[Computed]
@@ -64,19 +86,23 @@ new #[Title('KPI Dashboard')] class extends Component
     #[Computed]
     public function transactionCount(): int
     {
-        [$start, $end] = $this->dateRange();
-        return Transaction::where('status', 'completed')
+        $range = $this->dateRange();
+        [$start, $end] = $range;
+        $pos = Transaction::where('status', 'completed')
             ->whereBetween('created_at', [$start, $end])
             ->count();
+        return $pos + $this->onlineOrderCount($range);
     }
 
     #[Computed]
     public function previousTransactionCount(): int
     {
-        [$start, $end] = $this->previousDateRange();
-        return Transaction::where('status', 'completed')
+        $range = $this->previousDateRange();
+        [$start, $end] = $range;
+        $pos = Transaction::where('status', 'completed')
             ->whereBetween('created_at', [$start, $end])
             ->count();
+        return $pos + $this->onlineOrderCount($range);
     }
 
     #[Computed]
@@ -114,41 +140,89 @@ new #[Title('KPI Dashboard')] class extends Component
     public function totalDiscounts(): float
     {
         [$start, $end] = $this->dateRange();
-        $orderDiscount = (float) Transaction::where('status', 'completed')
+        $posOrderDiscount = (float) Transaction::where('status', 'completed')
             ->whereBetween('created_at', [$start, $end])
             ->sum('discount_amount');
-        $itemDiscount = (float) DB::table('transaction_items as ti')
+        $posItemDiscount = (float) DB::table('transaction_items as ti')
             ->join('transactions as t', 't.id', '=', 'ti.transaction_id')
             ->where('t.status', 'completed')
             ->whereBetween('t.created_at', [$start, $end])
             ->sum('ti.discount_amount');
-        return $orderDiscount + $itemDiscount;
+        $onlineOrderDiscount = (float) Order::where('payment_status', 'paid')
+            ->whereBetween('updated_at', [$start, $end])
+            ->sum('discount_amount');
+        $onlineItemDiscount = (float) DB::table('order_items as oi')
+            ->join('orders as o', 'o.id', '=', 'oi.order_id')
+            ->where('o.payment_status', 'paid')
+            ->whereBetween('o.updated_at', [$start, $end])
+            ->sum('oi.discount_amount');
+        return $posOrderDiscount + $posItemDiscount + $onlineOrderDiscount + $onlineItemDiscount;
     }
 
     #[Computed]
     public function paymentBreakdown(): \Illuminate\Support\Collection
     {
         [$start, $end] = $this->dateRange();
-        return Transaction::where('status', 'completed')
+
+        $pos = DB::table('transactions')
+            ->where('status', 'completed')
             ->whereBetween('created_at', [$start, $end])
             ->selectRaw('payment_method, COUNT(*) as tx_count, SUM(total) as revenue')
             ->groupBy('payment_method')
-            ->orderByDesc('revenue')
+            ->get()
+            ->keyBy('payment_method');
+
+        $online = DB::table('orders')
+            ->where('payment_status', 'paid')
+            ->whereBetween('updated_at', [$start, $end])
+            ->selectRaw('payment_method, COUNT(*) as tx_count, SUM(total) as revenue')
+            ->groupBy('payment_method')
             ->get();
+
+        foreach ($online as $row) {
+            if (isset($pos[$row->payment_method])) {
+                $pos[$row->payment_method]->tx_count += $row->tx_count;
+                $pos[$row->payment_method]->revenue  += $row->revenue;
+            } else {
+                $pos[$row->payment_method] = $row;
+            }
+        }
+
+        return $pos->values()->sortByDesc('revenue')->values();
     }
 
     #[Computed]
     public function topProducts(): \Illuminate\Support\Collection
     {
         [$start, $end] = $this->dateRange();
-        return TransactionItem::selectRaw('product_id, product_name, SUM(quantity) as total_qty, SUM(subtotal) as total_revenue')
-            ->whereHas('transaction', fn ($q) => $q
-                ->where('status', 'completed')
-                ->whereBetween('created_at', [$start, $end]))
-            ->groupBy('product_id', 'product_name')
-            ->orderByDesc('total_revenue')
-            ->limit(5)
+
+        $pos = DB::table('transaction_items as ti')
+            ->join('transactions as t', 't.id', '=', 'ti.transaction_id')
+            ->where('t.status', 'completed')
+            ->whereBetween('t.created_at', [$start, $end])
+            ->selectRaw('ti.product_id, ti.product_name, SUM(ti.quantity) as total_qty, SUM(ti.subtotal) as total_revenue')
+            ->groupBy('ti.product_id', 'ti.product_name')
+            ->get()
+            ->keyBy('product_id');
+
+        $online = DB::table('order_items as oi')
+            ->join('orders as o', 'o.id', '=', 'oi.order_id')
+            ->where('o.payment_status', 'paid')
+            ->whereBetween('o.updated_at', [$start, $end])
+            ->selectRaw('oi.product_id, oi.product_name, SUM(oi.quantity) as total_qty, SUM(oi.subtotal) as total_revenue')
+            ->groupBy('oi.product_id', 'oi.product_name')
             ->get();
+
+        foreach ($online as $row) {
+            if (isset($pos[$row->product_id])) {
+                $pos[$row->product_id]->total_qty     += $row->total_qty;
+                $pos[$row->product_id]->total_revenue += $row->total_revenue;
+            } else {
+                $pos[$row->product_id] = $row;
+            }
+        }
+
+        return $pos->values()->sortByDesc('total_revenue')->take(5)->values();
     }
 
     #[Computed]
@@ -179,60 +253,83 @@ new #[Title('KPI Dashboard')] class extends Component
 
     private function trendToday(): \Illuminate\Support\Collection
     {
-        $rows = Transaction::where('status', 'completed')
+        $isSqlite = config('database.default') === 'sqlite';
+
+        $pos = Transaction::where('status', 'completed')
             ->whereDate('created_at', today())
-            ->selectRaw(
-                config('database.default') === 'sqlite'
-                    ? "CAST(strftime('%H', created_at) AS INTEGER) as hour, SUM(total) as total"
-                    : 'HOUR(created_at) as hour, SUM(total) as total'
-            )
+            ->selectRaw($isSqlite
+                ? "CAST(strftime('%H', created_at) AS INTEGER) as hour, SUM(total) as total"
+                : 'HOUR(created_at) as hour, SUM(total) as total')
+            ->groupBy('hour')
+            ->pluck('total', 'hour');
+
+        $online = Order::where('payment_status', 'paid')
+            ->whereDate('updated_at', today())
+            ->selectRaw($isSqlite
+                ? "CAST(strftime('%H', updated_at) AS INTEGER) as hour, SUM(total) as total"
+                : 'HOUR(updated_at) as hour, SUM(total) as total')
             ->groupBy('hour')
             ->pluck('total', 'hour');
 
         return collect(range(0, 23))->map(fn ($h) => [
             'label' => sprintf('%02d', $h),
-            'total' => (float) ($rows[$h] ?? 0),
+            'total' => (float) ($pos[$h] ?? 0) + (float) ($online[$h] ?? 0),
         ]);
     }
 
     private function trendWeek(): \Illuminate\Support\Collection
     {
         $start = now()->startOfWeek();
-        return collect(range(0, 6))->map(fn ($offset) => [
-            'label' => $start->copy()->addDays($offset)->format('D'),
-            'total' => (float) Transaction::where('status', 'completed')
-                ->whereDate('created_at', $start->copy()->addDays($offset))
-                ->sum('total'),
-        ]);
+        return collect(range(0, 6))->map(function ($offset) use ($start) {
+            $day = $start->copy()->addDays($offset);
+            $pos = (float) Transaction::where('status', 'completed')
+                ->whereDate('created_at', $day)->sum('total');
+            $online = (float) Order::where('payment_status', 'paid')
+                ->whereDate('updated_at', $day)->sum('total');
+            return ['label' => $day->format('D'), 'total' => $pos + $online];
+        });
     }
 
     private function trendMonth(): \Illuminate\Support\Collection
     {
-        $rows = Transaction::where('status', 'completed')
+        $pos = Transaction::where('status', 'completed')
             ->whereYear('created_at', now()->year)
             ->whereMonth('created_at', now()->month)
             ->selectRaw('DAY(created_at) as day, SUM(total) as total')
             ->groupBy('day')
             ->pluck('total', 'day');
 
+        $online = Order::where('payment_status', 'paid')
+            ->whereYear('updated_at', now()->year)
+            ->whereMonth('updated_at', now()->month)
+            ->selectRaw('DAY(updated_at) as day, SUM(total) as total')
+            ->groupBy('day')
+            ->pluck('total', 'day');
+
         return collect(range(1, now()->daysInMonth))->map(fn ($d) => [
             'label' => (string) $d,
-            'total' => (float) ($rows[$d] ?? 0),
+            'total' => (float) ($pos[$d] ?? 0) + (float) ($online[$d] ?? 0),
         ]);
     }
 
     private function trendYear(): \Illuminate\Support\Collection
     {
-        $rows = Transaction::where('status', 'completed')
+        $pos = Transaction::where('status', 'completed')
             ->whereYear('created_at', now()->year)
             ->selectRaw('MONTH(created_at) as month, SUM(total) as total')
+            ->groupBy('month')
+            ->pluck('total', 'month');
+
+        $online = Order::where('payment_status', 'paid')
+            ->whereYear('updated_at', now()->year)
+            ->selectRaw('MONTH(updated_at) as month, SUM(total) as total')
             ->groupBy('month')
             ->pluck('total', 'month');
 
         $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         return collect(range(1, 12))->map(fn ($m) => [
             'label' => $months[$m - 1],
-            'total' => (float) ($rows[$m] ?? 0),
+            'total' => (float) ($pos[$m] ?? 0) + (float) ($online[$m] ?? 0),
         ]);
     }
 
