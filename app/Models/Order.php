@@ -37,6 +37,7 @@ class Order extends Model
         'cancelled_at',
         'cancellation_reason',
         'notes',
+        'rider_id',
     ];
 
     protected $casts = [
@@ -69,6 +70,11 @@ class Order extends Model
     public function cancelledBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
+    public function rider(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rider_id');
     }
 
     public function getBalanceAttribute(): float

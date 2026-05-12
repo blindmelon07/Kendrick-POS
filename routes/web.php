@@ -73,6 +73,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::livewire('users', 'users.management')->name('users.index');
         Route::livewire('admin/backup', 'admin.backup')->name('admin.backup');
     });
+
+    // Rider portal
+    Route::middleware('role:rider')->group(function () {
+        Route::livewire('rider/dashboard', 'rider.dashboard')->name('rider.dashboard');
+        Route::livewire('rider/deliveries', 'rider.my-deliveries')->name('rider.deliveries');
+    });
 });
 
 require __DIR__.'/settings.php';

@@ -77,6 +77,17 @@
                 </flux:sidebar.group>
                 @endhasanyrole
 
+                @hasanyrole('rider')
+                <flux:sidebar.group :heading="__('Rider Portal')" class="grid">
+                    <flux:sidebar.item icon="home" :href="route('rider.dashboard')" :current="request()->routeIs('rider.dashboard')" wire:navigate>
+                        {{ __('Dashboard') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="truck" :href="route('rider.deliveries')" :current="request()->routeIs('rider.deliveries')" wire:navigate>
+                        {{ __('My Deliveries') }}
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+                @endhasanyrole
+
                 @can('users.manage')
                 <flux:sidebar.group :heading="__('Admin')" class="grid">
                     <flux:sidebar.item icon="users" :href="route('users.index')" :current="request()->routeIs('users.*')" wire:navigate>

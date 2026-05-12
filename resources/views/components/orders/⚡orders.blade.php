@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Order;
+use App\Models\User;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -28,13 +29,18 @@ new #[Title('Customer Orders')] class extends Component
     public bool $showItemsModal = false;
     public ?int $viewingId = null;
 
+    // Assign rider
+    public bool $showRiderModal = false;
+    public ?int $assigningOrderId = null;
+    public ?int $selectedRiderId = null;
+
     public function updatedSearch(): void { $this->resetPage(); }
 
     #[Computed]
     public function orders(): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
         return Order::query()
-            ->with(['items', 'createdBy'])
+            ->with(['items', 'createdBy', 'rider'])
             ->when($this->search, fn ($q) => $q
                 ->where('reference_no', 'like', "%{$this->search}%")
                 ->orWhere('client_name', 'like', "%{$this->search}%")
@@ -44,6 +50,28 @@ new #[Title('Customer Orders')] class extends Component
             ->when($this->paymentFilter, fn ($q) => $q->where('payment_status', $this->paymentFilter))
             ->latest()
             ->paginate(15);
+    }
+
+    #[Computed]
+    public function riders(): \Illuminate\Database\Eloquent\Collection
+    {
+        return User::role('rider')->orderBy('name')->get();
+    }
+
+    public function openRiderModal(int $orderId, ?int $currentRiderId): void
+    {
+        $this->assigningOrderId = $orderId;
+        $this->selectedRiderId  = $currentRiderId;
+        $this->showRiderModal   = true;
+    }
+
+    public function assignRider(): void
+    {
+        $order = Order::findOrFail($this->assigningOrderId);
+        $order->update(['rider_id' => $this->selectedRiderId ?: null]);
+        $this->showRiderModal = false;
+        unset($this->orders);
+        $this->dispatch('notify', message: $this->selectedRiderId ? 'Rider assigned.' : 'Rider unassigned.');
     }
 
     #[Computed]
@@ -232,6 +260,7 @@ new #[Title('Customer Orders')] class extends Component
                     <th class="px-4 py-3 text-center font-medium text-zinc-600 dark:text-zinc-300">Items</th>
                     <th class="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-300">Total</th>
                     <th class="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-300">Balance</th>
+                    <th class="px-4 py-3 text-left font-medium text-zinc-600 dark:text-zinc-300">Rider</th>
                     <th class="px-4 py-3 text-center font-medium text-zinc-600 dark:text-zinc-300">Status</th>
                     <th class="px-4 py-3 text-center font-medium text-zinc-600 dark:text-zinc-300">Payment</th>
                     <th class="px-4 py-3 text-center font-medium text-zinc-600 dark:text-zinc-300">Actions</th>
@@ -255,6 +284,13 @@ new #[Title('Customer Orders')] class extends Component
                         <td class="px-4 py-3 text-right {{ $order->balance > 0 ? 'text-red-500 font-semibold' : 'text-zinc-400' }}">
                             ₱{{ number_format($order->balance, 2) }}
                         </td>
+                        <td class="px-4 py-3 text-sm">
+                            @if ($order->rider)
+                                <p class="font-medium text-zinc-800 dark:text-zinc-100">{{ $order->rider->name }}</p>
+                            @else
+                                <span class="text-zinc-400 italic text-xs">Unassigned</span>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 text-center">
                             <flux:badge size="sm" color="{{ $this->statusColor($order->status) }}">
                                 {{ ucfirst(str_replace('_', ' ', $order->status)) }}
@@ -269,6 +305,7 @@ new #[Title('Customer Orders')] class extends Component
                             <div class="flex items-center justify-center gap-1">
                                 <flux:button wire:click="viewItems({{ $order->id }})" variant="ghost" size="sm" icon="list-bullet" title="View Items" />
                                 @if ($order->status !== 'cancelled' && $order->status !== 'delivered')
+                                    <flux:button wire:click="openRiderModal({{ $order->id }}, {{ $order->rider_id ?? 'null' }})" variant="ghost" size="sm" icon="user" title="Assign Rider" />
                                     <flux:button wire:click="openStatusModal({{ $order->id }}, '{{ $order->status }}')" variant="ghost" size="sm" icon="arrow-path" title="Update Status" />
                                     <flux:button wire:click="openCancelModal({{ $order->id }})" variant="ghost" size="sm" icon="x-circle" class="text-red-500" title="Cancel Order" />
                                 @endif
@@ -277,7 +314,7 @@ new #[Title('Customer Orders')] class extends Component
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="px-4 py-10 text-center text-zinc-400">No orders found.</td>
+                        <td colspan="10" class="px-4 py-10 text-center text-zinc-400">No orders found.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -383,6 +420,27 @@ new #[Title('Customer Orders')] class extends Component
         <div class="mt-4 flex justify-end gap-2">
             <flux:button wire:click="$set('showStatusModal', false)" variant="ghost">Cancel</flux:button>
             <flux:button wire:click="updateStatus" variant="primary">Update</flux:button>
+        </div>
+    </flux:modal>
+
+    {{-- Assign Rider Modal --}}
+    <flux:modal wire:model="showRiderModal" class="max-w-sm">
+        <flux:heading>Assign Rider</flux:heading>
+        <flux:text class="mt-1">Select a rider to handle this delivery.</flux:text>
+        <div class="mt-4">
+            <flux:field>
+                <flux:label>Rider</flux:label>
+                <flux:select wire:model="selectedRiderId">
+                    <flux:select.option value="">— Unassigned —</flux:select.option>
+                    @foreach ($this->riders as $rider)
+                        <flux:select.option value="{{ $rider->id }}">{{ $rider->name }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+            </flux:field>
+        </div>
+        <div class="mt-4 flex justify-end gap-2">
+            <flux:button wire:click="$set('showRiderModal', false)" variant="ghost">Cancel</flux:button>
+            <flux:button wire:click="assignRider" variant="primary">Assign</flux:button>
         </div>
     </flux:modal>
 

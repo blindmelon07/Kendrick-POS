@@ -35,6 +35,9 @@ class RolesAndPermissionsSeeder extends Seeder
 
             // Users
             'users.manage',
+
+            // Rider
+            'rider.access',
         ];
 
         foreach ($permissions as $permission) {
@@ -68,6 +71,10 @@ class RolesAndPermissionsSeeder extends Seeder
         $admin = Role::firstOrCreate(['name' => 'admin']);
         $admin->syncPermissions(Permission::all());
 
+        /** Rider: delivery portal only */
+        $rider = Role::firstOrCreate(['name' => 'rider']);
+        $rider->syncPermissions(['rider.access']);
+
         // ── Demo Users ────────────────────────────────────────────────────────
         $adminUser = User::firstOrCreate(
             ['email' => 'admin@example.com'],
@@ -99,7 +106,17 @@ class RolesAndPermissionsSeeder extends Seeder
         );
         $cashierUser->syncRoles('cashier');
 
-        $this->command->info('Roles: admin, manager, cashier — and 3 demo users created.');
+        $riderUser = User::firstOrCreate(
+            ['email' => 'rider@example.com'],
+            [
+                'name'     => 'Rider User',
+                'password' => bcrypt('password'),
+                'email_verified_at' => now(),
+            ]
+        );
+        $riderUser->syncRoles('rider');
+
+        $this->command->info('Roles: admin, manager, cashier, rider — and 4 demo users created.');
     }
 }
 
